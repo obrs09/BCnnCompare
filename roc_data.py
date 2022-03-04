@@ -87,6 +87,7 @@ class roc(object):
     def __init__(self, prob):
         self.prob = prob
         self.thres = np.arange(0, 1, 0.001)
+        self.thres_list_len = np.shape(self.thres)[0]
         self.lenth = int(prob.shape[0] / 2)
 
         self.tnl = []
@@ -95,7 +96,7 @@ class roc(object):
         self.tpl = []
         self.acc = []
         self.y_true = np.append(np.zeros(self.lenth), np.ones(self.lenth))
-
+        self.round_num = 3
         # self.C2 = self.confusion_matrix_plot_crit()
         # self.cd = self.crit_point()
 
@@ -159,51 +160,73 @@ class roc(object):
     def tpr_eval(self):
         #self.C2 = self.confusion_matrix_plot_crit()
         self.tpr = self.tpl_out / (self.tpl_out + self.fnl_out)
-        return self.tpr
+        return np.round(self.tpr, self.round_num)
 
     def fpr_eval(self):
         #self.C2 = self.confusion_matrix_plot_crit()
         self.fpr = self.fpl_out / (self.fpl_out + self.tnl_out)
-        return self.fpr
+        return np.round(self.fpr, self.round_num)
 
     def tnr_eval(self):
         #self.C2 = self.confusion_matrix_plot_crit()
         self.tnr = self.tnl_out / (self.tnl_out + self.fpl_out)
-        return self.tnr
+        return np.round(self.tnr, self.round_num)
 
     def ppv_eval(self):
         self.ppv = self.tpl_out[self.cd] / (self.tpl_out[self.cd] + self.fpl_out[self.cd])
-        return self.ppv
+        return np.round(self.ppv, self.round_num)
 
     def f1_eval(self):
         self.ppv = self.ppv_eval()
         self.tpr = self.tpr_eval()
         self.f1 = 2 * self.ppv * self.tpr[self.cd] / (self.ppv + self.tpr[self.cd])
-        return self.f1
+        return np.round(self.f1, self.round_num)
 
     def mcc_eval(self):
+        self.mcc_list = []
         self.mcc = (self.tpl_out[self.cd] * self.tnl_out[self.cd] - self.fpl_out[self.cd] * self.fnl_out[self.cd])\
                    / (np.sqrt(
             (self.tpl_out[self.cd] + self.fpl_out[self.cd]) * (self.tpl_out[self.cd] + self.fnl_out[self.cd]) *
             (self.tnl_out[self.cd] + self.fpl_out[self.cd]) * (self.tnl_out[self.cd] + self.fnl_out[self.cd])))
-        return self.mcc
+        for i in range(len(self.cd[0])):
+
+            self.mcc_list.append([self.cd[0][i]/self.thres_list_len, np.round(self.mcc[i], self.round_num)])
+        self.mcc_list = np.array(self.mcc_list)
+        return np.round(self.mcc, self.round_num), self.mcc_list
 
     def acc_eval(self):
-        self.acc = (self.tpl_out + self.tnl_out) \
-                   / (self.tpl_out + self.tnl_out + self.fpl_out + self.fnl_out)
-        return self.acc
+        self.acc = (self.tpl_out[self.cd] + self.tnl_out[self.cd]) \
+                   / (self.tpl_out[self.cd] + self.tnl_out[self.cd] + self.fpl_out[self.cd] + self.fnl_out[self.cd])
+        return np.round(self.acc, self.round_num)
 
     def confusion_matrix_plot_crit(self):
-
-
+        self.C2all = []
+        self.cd_range = []
 #        C2 = confusion_matrix(y_true, y_pred, labels=[0, 1])
 #        tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
-        tn = self.tnl_out[self.cd[0]]
-        fp = self.fpl_out[self.cd[0]]
-        fn = self.fnl_out[self.cd[0]]
-        tp = self.tpl_out[self.cd[0]]
-        self.C2 = np.array([[tn[0], fp[0]],[fn[0], tp[0]]])
-        return self.C2
+        for i in range(len(self.cd[0])):
+
+            tn = self.tnl_out[self.cd[0][i]]
+            fp = self.fpl_out[self.cd[0][i]]
+            fn = self.fnl_out[self.cd[0][i]]
+            tp = self.tpl_out[self.cd[0][i]]
+            self.C2all.append(np.array([[tn, fp], [fn, tp]]))
+        self.C2all = np.array(self.C2all)
+        self.C2 = np.unique(self.C2all, axis=0)
+
+        ppp = []
+        for j in range(np.shape(self.C2)[0]):
+            ll = []
+            for k in range(np.shape(self.C2all)[0]):
+                self.CC = self.C2[j] == self.C2all[k]
+                if self.CC.all():
+                    ll.append(k)
+
+            ppp.append([min(ll), max(ll)])
+
+            self.cd_range.append([self.cd[0][min(ll)], self.cd[0][max(ll)]])
+        self.cd_range = np.array(self.cd_range)
+        return self.C2, self.cd_range/self.thres_list_len
 
     # def confusion_matrix_plot_5(self):
     #     f, ax2 = plt.subplots(figsize=(10, 8), nrows=1)
